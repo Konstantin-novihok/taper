@@ -10,10 +10,9 @@ permissions:
 
 jobs:
   build:
-    name: Build Debug APK
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -27,7 +26,7 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build APK
+      - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
       - name: Upload APK
@@ -36,4 +35,4 @@ jobs:
           name: tapper-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 14
