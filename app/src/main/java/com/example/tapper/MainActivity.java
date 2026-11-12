@@ -51,7 +51,7 @@ public class MainActivity extends Activity {
         root.addView(freqLabel);
 
         SeekBar bar = new SeekBar(this);
-        bar.setMax(9);
+        bar.setMax(9); // 0..9 -> 1..10
         bar.setProgress(freq - 1);
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int prog, boolean user) {
