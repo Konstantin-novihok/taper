@@ -3,6 +3,7 @@ plugins { id 'com.android.application' }
 android {
     namespace 'com.example.tapper'
     compileSdk 34
+
     defaultConfig {
         applicationId "com.example.tapper"
         minSdk 24
@@ -10,9 +11,27 @@ android {
         versionCode 1
         versionName "1.0"
     }
-    buildTypes {
-        release { minifyEnabled false }
+
+    signingConfigs {
+        release {
+            def ksPath = System.getenv("TAPPER_STORE_FILE")
+            if (ksPath != null && !ksPath.isEmpty()) {
+                storeFile file(ksPath)
+                storePassword System.getenv("TAPPER_STORE_PASSWORD")
+                keyAlias System.getenv("TAPPER_KEY_ALIAS")
+                keyPassword System.getenv("TAPPER_KEY_PASSWORD")
+            }
+        }
     }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            debuggable false
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
