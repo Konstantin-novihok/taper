@@ -1,4 +1,4 @@
-name: Android APK
+name: Android Release APK
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,18 +21,75 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
       - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
-      - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+      - name: Validate signing secrets
+        env:
+          TAPPER_KEYSTORE_BASE64: ${{ secrets.TAPPER_KEYSTORE_BASE64 }}
+          TAPPER_STORE_PASSWORD: ${{ secrets.TAPPER_STORE_PASSWORD }}
+          TAPPER_KEY_ALIAS: ${{ secrets.TAPPER_KEY_ALIAS }}
+          TAPPER_KEY_PASSWORD: ${{ secrets.TAPPER_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in TAPPER_KEYSTORE_BASE64 TAPPER_STORE_PASSWORD TAPPER_KEY_ALIAS TAPPER_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+          echo "$TAPPER_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tapper-release.jks"
+          test -s "$RUNNER_TEMP/tapper-release.jks"
+          chmod 600 "$RUNNER_TEMP/tapper-release.jks"
 
-      - name: Upload APK
+      - name: Build signed release APK
+        env:
+          TAPPER_STORE_FILE: ${{ runner.temp }}/tapper-release.jks
+          TAPPER_STORE_PASSWORD: ${{ secrets.TAPPER_STORE_PASSWORD }}
+          TAPPER_KEY_ALIAS: ${{ secrets.TAPPER_KEY_ALIAS }}
+          TAPPER_KEY_PASSWORD: ${{ secrets.TAPPER_KEY_PASSWORD }}
+        run: gradle --no-daemon --stacktrace assembleRelease
+
+      - name: Verify signature and audit declared permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          TOOLS="$ANDROID_HOME/build-tools/34.0.0"
+          mkdir -p audit
+          "$TOOLS/zipalign" -c -v 4 "$APK" > audit/zipalign.txt
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK" > audit/signature.txt 2>&1
+          "$TOOLS/aapt" dump permissions "$APK" > audit/permissions.txt
+          {
+            echo "APK: app-release.apk"
+            echo "SHA-256:"
+            sha256sum "$APK"
+            echo
+            echo "Declared Android permissions:"
+            cat audit/permissions.txt
+            echo
+            echo "Signature verification:"
+            cat audit/signature.txt
+            echo
+            echo "Zip alignment:"
+            cat audit/zipalign.txt
+          } > audit/RELEASE-AUDIT.txt
+          cat audit/RELEASE-AUDIT.txt
+
+      - name: Upload signed release APK and audit
         uses: actions/upload-artifact@v4
         with:
-          name: tapper-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: tapper-release-apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            audit/RELEASE-AUDIT.txt
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
