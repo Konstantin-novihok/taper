@@ -33,15 +33,15 @@ public class TapService extends AccessibilityService {
     private WindowManager wm;
     private LinearLayout panel;
     private WindowManager.LayoutParams panelLp;
-    private View selector;
-    private AreaFrame frame;
+    private View selector;       // полноэкранный слой выбора области
+    private AreaFrame frame;     // рамка области (не перехватывает касания)
     private TextView freqLabel;
     private Button startBtn;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random rnd = new Random();
     private boolean running = false;
-    private RectF area = null;
+    private RectF area = null;   // в экранных координатах
     private int freq = 1;
 
     private final Runnable tick = new Runnable() {
@@ -84,6 +84,7 @@ public class TapService extends AccessibilityService {
         if (freqLabel != null) freqLabel.setText(freq + "/с");
     }
 
+    // ---------- Панель управления ----------
     void showPanel() {
         if (panel != null) return;
         panel = new LinearLayout(this);
@@ -123,6 +124,7 @@ public class TapService extends AccessibilityService {
         panelLp.x = 20;
         panelLp.y = 200;
 
+        // перетаскивание за «≡»
         handle.setOnTouchListener(new View.OnTouchListener() {
             int sx, sy; float tx, ty;
             @Override public boolean onTouch(View v, MotionEvent e) {
@@ -170,6 +172,7 @@ public class TapService extends AccessibilityService {
         panel = null; selector = null; frame = null;
     }
 
+    // ---------- Выбор области ----------
     private WindowManager.LayoutParams fullScreen(boolean touchable) {
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
@@ -209,6 +212,7 @@ public class TapService extends AccessibilityService {
                     case MotionEvent.ACTION_UP:
                         RectF r = new RectF(Math.min(x0, x), Math.min(y0, y), Math.max(x0, x), Math.max(y0, y));
                         if (r.width() < 30 || r.height() < 30) {
+                            // слишком маленькая — считаем как точку 30x30
                             r = new RectF(x - 15, y - 15, x + 15, y + 15);
                         }
                         finishSelecting(r);
@@ -227,12 +231,14 @@ public class TapService extends AccessibilityService {
         try { if (frame != null) wm.removeView(frame); } catch (Exception ignored) {}
         frame = new AreaFrame(this);
         frame.setRectScreen(area);
-        wm.addView(frame, fullScreen(false));
+        wm.addView(frame, fullScreen(false)); // не перехватывает касания
+        // панель поверх рамки
         if (panel != null) {
             try { wm.removeView(panel); wm.addView(panel, panelLp); } catch (Exception ignored) {}
         }
     }
 
+    // ---------- Тапы ----------
     private void startTapping() {
         if (area == null) {
             Toast.makeText(this, "Сначала выберите область (▭)", Toast.LENGTH_SHORT).show();
@@ -254,6 +260,7 @@ public class TapService extends AccessibilityService {
         float x = area.left + rnd.nextFloat() * Math.max(1, area.width());
         float y = area.top + rnd.nextFloat() * Math.max(1, area.height());
 
+        // не нажимать на саму панель
         if (panel != null) {
             int[] l = new int[2];
             panel.getLocationOnScreen(l);
@@ -267,6 +274,7 @@ public class TapService extends AccessibilityService {
         dispatchGesture(new GestureDescription.Builder().addStroke(stroke).build(), null, null);
     }
 
+    // ---------- Рамка области ----------
     static class AreaFrame extends View {
         RectF screenRect = null;
         boolean dim = false;
