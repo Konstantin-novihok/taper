@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Тапер</string>
+    <string name="service_desc">Эмулирует нажатия на экран в выбранной области. Нужен для работы автокликера.</string>
+</resources>
